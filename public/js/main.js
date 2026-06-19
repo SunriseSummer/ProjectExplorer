@@ -16,7 +16,7 @@ async function boot() {
     const treeRes = await Api.tree();
     State.tree = treeRes.tree;
     State.project = treeRes.project;
-    $('brand-sub').textContent = `${treeRes.project} · 项目解析`;
+    $('brand-sub').textContent = `用 AI 快速理解任意项目`;
     $('tree-count').textContent = `${countFiles(State.tree)} files`;
     $('proj-desc').textContent = `${treeRes.project} · 选择目录或文件开始`;
 
