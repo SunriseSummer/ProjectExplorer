@@ -14,6 +14,13 @@ const DEFAULT_STRATEGY = {
 // DeepSeek 等模型偶尔会以文本协议（DSML）而非结构化 tool_calls 发起工具调用，
 // 流式转发正文前需用该开头标记排除掉这类协议片段，避免协议泄漏到正文。
 const TEXT_TOOL_OPENER = /<\s*(?:[｜|]{2}|\?{2})DSML/u;
+// 流式空闲超时：KIMI 等推理模型在重负载问题上会"静默思考"很久（实测可达 ~100s
+// 且期间不推送任何字节）才吐正文。该阈值放得较宽，仅用于兜底——当上游连接彻底
+// 卡死（长时间无任何字节）时中断并报错，避免前端无限转圈，同时避免误杀长推理。
+const STREAM_IDLE_TIMEOUT_MS = 180000;
+// 心跳间隔：一轮请求里在首个真实输出（思考/正文/工具调用）出现前，
+// 周期性向前端发送进度事件，让用户看到模型确实在工作而不是卡死。
+const STREAM_HEARTBEAT_MS = 3000;
 
 export const TOOLS = [
   {
@@ -200,9 +207,40 @@ export function createAgentService({ projectService, configStore }) {
   // 工具轮（结构化 tool_calls 或 DSML 文本协议）不转发正文，仅累积后交给调用方处理。
   async function streamCompletion(messages, { tools, res }) {
     const minForwardChars = strat().streamForwardMinChars;
-    const response = await requestChatCompletion(messages, { tools, stream: true }).catch((error) => ({ error }));
-    if (response.error) return { error: `API 连接失败: ${response.error.message}` };
-    if (!response.ok) return { error: `API ${response.status}: ${(await response.text().catch(() => '')).slice(0, 300)}` };
+    const controller = new AbortController();
+    let idleAborted = false;
+    let idleTimer = null;
+    const armIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { idleAborted = true; controller.abort(); }, STREAM_IDLE_TIMEOUT_MS);
+    };
+    const clearIdle = () => { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } };
+
+    // 心跳：在首个真实信号（思考/正文/工具调用）出现前周期性推送进度，
+    // 让前端展示"模型正在思考（已用时 Ns）"，避免静默推理被误判为卡死。
+    // 必须在 await fetch 之前启动：KIMI 带 tools 直接作答时，会先静默推理很久
+    // 才返回响应头（fetch 在此期间一直挂起），此时只有事先启动的心跳能持续反馈。
+    const startedAt = Date.now();
+    let signaled = false;
+    let heartbeat = null;
+    const stopHeartbeat = () => { if (heartbeat) { clearInterval(heartbeat); heartbeat = null; } };
+    const markSignaled = () => { signaled = true; stopHeartbeat(); };
+    heartbeat = setInterval(() => {
+      if (!signaled) sendSSE(res, { type: 'progress', elapsedMs: Date.now() - startedAt });
+    }, STREAM_HEARTBEAT_MS);
+
+    armIdle();
+    const response = await requestChatCompletion(messages, { tools, stream: true, signal: controller.signal }).catch((error) => ({ error }));
+    if (response.error) {
+      clearIdle();
+      stopHeartbeat();
+      return { error: idleAborted ? `API 连接超时（${Math.round(STREAM_IDLE_TIMEOUT_MS / 1000)}s 无响应）` : `API 连接失败: ${response.error.message}` };
+    }
+    if (!response.ok) {
+      clearIdle();
+      stopHeartbeat();
+      return { error: `API ${response.status}: ${(await response.text().catch(() => '')).slice(0, 300)}` };
+    }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -210,6 +248,7 @@ export function createAgentService({ projectService, configStore }) {
 
     let content = '';
     let reasoning = '';
+    let reasoningForwarded = false;
     const toolCalls = [];
     let decided = false;
     let forwarding = false;
@@ -233,49 +272,70 @@ export function createAgentService({ projectService, configStore }) {
         sendSSE(res, { type: 'delta', content: pending });
         flushed = content.length;
         forwardedAny = true;
+        markSignaled();
       }
     };
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      lineBuffer += decoder.decode(value, { stream: true });
-      const lines = lineBuffer.split('\n');
-      lineBuffer = lines.pop();
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const data = trimmed.slice(5).trim();
-        if (!data || data === '[DONE]') continue;
-        let parsed;
-        try {
-          parsed = JSON.parse(data);
-        } catch {
-          continue;
-        }
-        const delta = parsed.choices?.[0]?.delta;
-        if (!delta) continue;
-        if (Array.isArray(delta.tool_calls)) {
-          for (const tc of delta.tool_calls) {
-            const index = tc.index ?? 0;
-            if (!toolCalls[index]) toolCalls[index] = { id: '', type: 'function', function: { name: '', arguments: '' } };
-            const slot = toolCalls[index];
-            if (tc.id) slot.id = tc.id;
-            if (tc.type) slot.type = tc.type;
-            if (tc.function?.name) slot.function.name = tc.function.name;
-            if (tc.function?.arguments) slot.function.arguments += tc.function.arguments;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        armIdle(); // 收到任意字节即重置空闲计时器
+        lineBuffer += decoder.decode(value, { stream: true });
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop();
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const data = trimmed.slice(5).trim();
+          if (!data || data === '[DONE]') continue;
+          let parsed;
+          try {
+            parsed = JSON.parse(data);
+          } catch {
+            continue;
+          }
+          const delta = parsed.choices?.[0]?.delta;
+          if (!delta) continue;
+          if (Array.isArray(delta.tool_calls)) {
+            markSignaled(); // 进入工具轮，停止进度心跳（稍后由工具事件接管 UI）
+            for (const tc of delta.tool_calls) {
+              const index = tc.index ?? 0;
+              if (!toolCalls[index]) toolCalls[index] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+              const slot = toolCalls[index];
+              if (tc.id) slot.id = tc.id;
+              if (tc.type) slot.type = tc.type;
+              if (tc.function?.name) slot.function.name = tc.function.name;
+              if (tc.function?.arguments) slot.function.arguments += tc.function.arguments;
+            }
+          }
+          if (typeof delta.reasoning_content === 'string' && delta.reasoning_content) {
+            reasoning += delta.reasoning_content;
+            // 推理模型（KIMI/DeepSeek 等）在部分问题上会先吐 reasoning_content，
+            // 把思考过程实时转发给前端；停止纯进度心跳，改为展示真实思考内容。
+            sendSSE(res, { type: 'reasoning', content: delta.reasoning_content });
+            reasoningForwarded = true;
+            markSignaled();
+          }
+          if (typeof delta.content === 'string' && delta.content) {
+            content += delta.content;
+            pushForward(false);
           }
         }
-        if (typeof delta.reasoning_content === 'string') reasoning += delta.reasoning_content;
-        if (typeof delta.content === 'string' && delta.content) {
-          content += delta.content;
-          pushForward(false);
-        }
       }
+    } catch (error) {
+      clearIdle();
+      if (idleAborted) {
+        return { error: `模型响应超时：${Math.round(STREAM_IDLE_TIMEOUT_MS / 1000)}s 内没有任何数据，请重试或缩小问题范围` };
+      }
+      return { error: `读取模型响应失败: ${error.message}` };
+    } finally {
+      clearIdle();
+      stopHeartbeat();
     }
     pushForward(true);
 
-    return { content, reasoning, toolCalls: toolCalls.filter(Boolean), forwardedAny };
+    return { content, reasoning, toolCalls: toolCalls.filter(Boolean), forwardedAny, reasoningForwarded };
   }
 
   async function agenticChat(targetPath, nodeType, messages, res) {
@@ -359,10 +419,20 @@ export function createAgentService({ projectService, configStore }) {
       ? `请分析目录 /${targetPath || ''} 的功能定位和内容概览。仅返回 JSON：{"title":"...","kind":"dir","summary":"...","detail":["..."],"bullets":["..."],"tags":["..."]}`
       : `请分析文件 /${targetPath} 的功能、关键实现和项目角色。仅返回 JSON：{"title":"...","kind":"source|config|docs|asset","summary":"...","detail":["..."],"bullets":["..."],"tags":["..."]}`;
 
-    const response = await requestChatCompletion([
-      { role: 'system', content: `${buildSystemPrompt(projectService.projectName, targetPath, nodeType, context, '')}\n\n严格只返回 JSON，不要包裹代码块。` },
-      { role: 'user', content: userPrompt },
-    ], { max_tokens: 2000 });
+    // 非流式分析没有增量数据，用整体超时兜底，避免推理模型长时间无响应把请求挂死。
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+    let response;
+    try {
+      response = await requestChatCompletion([
+        { role: 'system', content: `${buildSystemPrompt(projectService.projectName, targetPath, nodeType, context, '')}\n\n严格只返回 JSON，不要包裹代码块。` },
+        { role: 'user', content: userPrompt },
+      ], { max_tokens: 2000, signal: controller.signal });
+    } catch (error) {
+      throw new Error(controller.signal.aborted ? `分析超时（${Math.round(STREAM_IDLE_TIMEOUT_MS / 1000)}s）` : error.message);
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!response.ok) throw new Error(`API ${response.status}`);
     const result = await response.json();
@@ -397,6 +467,7 @@ export function createAgentService({ projectService, configStore }) {
         ...(options.tools ? { tools: options.tools } : {}),
         ...(options.stream ? { stream: true } : {}),
       }),
+      signal: options.signal,
     });
   }
 

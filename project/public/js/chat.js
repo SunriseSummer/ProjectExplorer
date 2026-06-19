@@ -66,6 +66,7 @@ export function resetChatState(path, type) {
     analysisElement: null,
     buffer: '',
     displayed: '',
+    reasoning: '',
   });
 }
 
@@ -123,6 +124,7 @@ export function bindChatEvents(node) {
     }
   };
   input.oninput = () => autoGrowInput(input);
+  $('chat-msgs').onclick = onChatMessagesClick;
   if (presetBtn) {
     presetBtn.onclick = (event) => {
       event.stopPropagation();
@@ -256,10 +258,10 @@ function closePresetPop() {
 
 async function startChatStream(firstMessage) {
   if (ChatState.abortController) ChatState.abortController.abort();
-  Object.assign(ChatState, { streaming: true, buffer: '', displayed: '', abortController: new AbortController() });
+  Object.assign(ChatState, { streaming: true, buffer: '', displayed: '', reasoning: '', abortController: new AbortController() });
   setStreamingUI(true);
   ChatState.lastUserText = firstMessage;
-  ChatState.lastUserElement = addUserMessage(firstMessage);
+  ChatState.lastUserElement = addUserMessage(firstMessage, ChatState.messages.length);
   ChatState.messages.push({ role: 'user', content: firstMessage });
   ensureThinkingBar();
 
@@ -291,6 +293,12 @@ async function startChatStream(firstMessage) {
         if (payload.type === 'tool_result') {
           updateLastToolBar(payload.summary, payload.ok !== false);
           ensureAnalysisBar();
+        }
+        if (payload.type === 'progress') {
+          showProgress(payload.elapsedMs);
+        }
+        if (payload.type === 'reasoning') {
+          showReasoning(payload.content);
         }
         if (payload.type === 'discard') {
           discardStreamElement();
@@ -348,10 +356,11 @@ async function resetConversation(node) {
   renderEmptyState(node);
 }
 
-function addUserMessage(text) {
+function addUserMessage(text, messageIndex) {
   const item = document.createElement('div');
   item.className = 'chat-msg user';
-  item.innerHTML = `<div class="usr-banner"><span class="usr-label">Q</span><span class="usr-text">${escapeHTML(text)}</span></div>`;
+  item.dataset.messageIndex = String(messageIndex);
+  item.innerHTML = userMessageHTML(text);
   $('chat-msgs').appendChild(item);
   scrollChat();
   return item;
@@ -388,19 +397,57 @@ function abortChat() {
   if (!ChatState.messages.length) renderEmptyState(ChatState.node);
 }
 
+function onChatMessagesClick(event) {
+  const button = event.target.closest('.usr-delete');
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (ChatState.streaming) return;
+  deleteMessagePair(Number(button.closest('.chat-msg.user')?.dataset.messageIndex));
+}
+
+async function deleteMessagePair(index) {
+  if (!Number.isInteger(index) || ChatState.messages[index]?.role !== 'user') return;
+  const deleteCount = ChatState.messages[index + 1]?.role === 'assistant' ? 2 : 1;
+  ChatState.messages.splice(index, deleteCount);
+  if (ChatState.messages.length) {
+    await Api.saveAnalysis({ path: ChatState.currentPath, messages: ChatState.messages }).catch(() => null);
+    renderSavedMessages(ChatState.messages);
+  } else {
+    await Api.deleteAnalysis(ChatState.currentPath);
+    $('chat-msgs').innerHTML = '';
+    renderEmptyState(ChatState.node);
+  }
+}
+
 function renderSavedMessages(messages) {
   ChatState.messages = messages;
   const host = $('chat-msgs');
   host.innerHTML = '';
-  for (const message of messages) {
+  messages.forEach((message, index) => {
     const item = document.createElement('div');
     item.className = `chat-msg ${message.role === 'user' ? 'user' : 'assistant'}`;
-    item.innerHTML = message.role === 'user'
-      ? `<div class="usr-banner"><span class="usr-label">Q</span><span class="usr-text">${escapeHTML(message.content)}</span></div>`
-      : `<div class="doc-body">${renderMarkdown(message.content)}</div>`;
+    if (message.role === 'user') item.dataset.messageIndex = String(index);
+    item.innerHTML = message.role === 'user' ? userMessageHTML(message.content) : `<div class="doc-body">${renderMarkdown(message.content)}</div>`;
     host.appendChild(item);
-  }
+  });
   scrollChat();
+}
+
+function userMessageHTML(text) {
+  return `<div class="usr-banner">
+    <span class="usr-label">Q</span>
+    <span class="usr-text">${escapeHTML(text)}</span>
+    <button class="usr-delete" type="button" title="删除此轮对话" aria-label="删除此轮对话">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 6h18"></path>
+        <path d="M8 6V4h8v2"></path>
+        <path d="M19 6l-1 14H6L5 6"></path>
+        <path d="M10 11v5"></path>
+        <path d="M14 11v5"></path>
+      </svg>
+    </button>
+  </div>`;
 }
 
 function newAssistantMessage() {
@@ -460,6 +507,35 @@ function discardStreamElement() {
   ChatState.streamElement = null;
   ChatState.buffer = '';
   ChatState.displayed = '';
+  ChatState.reasoning = '';
+}
+
+// 心跳进度：某些推理模型（如 KIMI 直接作答时）会静默思考很久且不吐 reasoning_content，
+// 此时仅靠服务端心跳展示已用时，证明模型在工作而非卡死。有真实思考文本时不覆盖。
+function showProgress(elapsedMs) {
+  const bar = ChatState.thinkingElement || ChatState.analysisElement;
+  if (!bar) return;
+  const sec = Math.max(0, Math.round((elapsedMs || 0) / 1000));
+  const title = bar.querySelector('.tool-title');
+  const detail = bar.querySelector('.tool-detail');
+  if (title) title.textContent = 'AI 正在深度思考';
+  if (detail && !ChatState.reasoning) detail.textContent = `模型正在推理，请稍候…（已用时 ${sec}s）`;
+}
+
+// 把推理模型的"思考"实时显示在当前状态条上，让用户看到模型确实在工作，
+// 而不是面对长时间静止的"思考中"以为卡死。
+function showReasoning(delta) {
+  ChatState.reasoning = (ChatState.reasoning || '') + delta;
+  const bar = ChatState.thinkingElement || ChatState.analysisElement;
+  if (!bar) return;
+  const title = bar.querySelector('.tool-title');
+  const detail = bar.querySelector('.tool-detail');
+  if (title) title.textContent = 'AI 正在思考';
+  if (detail) {
+    // tool-detail 单行省略号会从右侧裁剪，这里只取末尾片段，让可见文字随思考持续滚动更新。
+    const tail = ChatState.reasoning.replace(/\s+/g, ' ').trim().slice(-72);
+    detail.textContent = tail || '正在组织思路…';
+  }
 }
 
 function ensureThinkingBar() {
@@ -490,6 +566,7 @@ function ensureAnalysisBar() {
   ChatState.thinkingElement?.remove();
   ChatState.thinkingElement = null;
   if (ChatState.analysisElement?.isConnected) return;
+  ChatState.reasoning = ''; // 进入新一轮"整合证据"阶段，重置思考缓冲，状态条只显示当前阶段的思考
   const item = document.createElement('div');
   item.className = 'chat-msg tool analyzing';
   item.innerHTML = toolBarHTML({
@@ -556,6 +633,9 @@ function setStreamingUI(streaming) {
   const presets = $('chat-presets');
   if (input) input.disabled = streaming;
   if (presets) presets.disabled = streaming;
+  $('chat-msgs')?.querySelectorAll('.usr-delete').forEach((button) => {
+    button.disabled = streaming;
+  });
   if (streaming) closePresetPop();
   if (send) {
     // 生成中：纸飞机变为终止按钮（仍可点击）；否则恢复发送

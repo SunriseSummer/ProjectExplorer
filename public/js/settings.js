@@ -4,7 +4,6 @@ import { $, escapeAttr, escapeHTML } from './utils.js';
 export const Settings = {
   cfg: null,
   selectedProvider: null,
-  draftActive: null,
   mode: 'providers',
 
   modelLabel(providerId, modelId) {
@@ -31,7 +30,6 @@ export const Settings = {
     try {
       this.cfg = await Api.config();
       this.selectedProvider = this.cfg.activeProvider;
-      this.draftActive = this.cfg.activeProvider;
       this.mode = 'providers';
       this.render();
     } catch (error) {
@@ -63,13 +61,13 @@ export const Settings = {
 
   renderProviders() {
     const ids = Object.keys(this.cfg.catalog);
-    const activeLabel = this.cfg.catalog[this.draftActive]?.label || this.draftActive;
-    const activeModel = this.cfg.providers[this.draftActive] ? this.modelLabel(this.draftActive, this.cfg.providers[this.draftActive].model) : '';
+    const activeLabel = this.cfg.catalog[this.selectedProvider]?.label || this.selectedProvider;
+    const activeModel = this.cfg.providers[this.selectedProvider] ? this.modelLabel(this.selectedProvider, this.cfg.providers[this.selectedProvider].model) : '';
     const tabs = ids.map((id) => {
       const hasKey = this.cfg.providers[id].hasKey;
       return `<button class="prov-tab${id === this.selectedProvider ? ' active' : ''}${hasKey ? ' has-key' : ''}" data-id="${id}"><span class="tickdot"></span>${escapeHTML(this.cfg.catalog[id].label)}</button>`;
     }).join('');
-    return `<div class="active-banner">当前生效：<b>${escapeHTML(activeLabel)} / ${escapeHTML(activeModel)}</b></div><div class="prov-tabs">${tabs}</div>${ids.map((id) => this.renderProviderPanel(id)).join('')}`;
+    return `<div class="active-banner">当前选择（保存后生效）：<b>${escapeHTML(activeLabel)} / ${escapeHTML(activeModel)}</b></div><div class="prov-tabs">${tabs}</div>${ids.map((id) => this.renderProviderPanel(id)).join('')}`;
   },
 
   bindProviders() {
@@ -80,11 +78,15 @@ export const Settings = {
         this.render();
       });
     });
-    $('settings-body').querySelectorAll('[data-setactive]').forEach((button) => {
-      button.addEventListener('click', () => {
+    // 切换模型时实时更新顶部"当前选择"提示
+    $('settings-body').querySelectorAll('.prov-panel.active [data-f="model"]').forEach((select) => {
+      select.addEventListener('change', () => {
         this.captureDraft();
-        this.draftActive = button.dataset.setactive;
-        this.render();
+        const banner = $('settings-body').querySelector('.active-banner b');
+        if (banner) {
+          const label = this.cfg.catalog[this.selectedProvider]?.label || this.selectedProvider;
+          banner.textContent = `${label} / ${this.modelLabel(this.selectedProvider, this.cfg.providers[this.selectedProvider].model)}`;
+        }
       });
     });
     $('settings-body').querySelectorAll('[data-test]').forEach((button) => {
@@ -143,14 +145,12 @@ export const Settings = {
     const known = catalog.models.some((model) => model.id === provider.model);
     const models = known ? catalog.models : [{ id: provider.model, label: provider.model }, ...catalog.models];
     const options = models.map((model) => `<option value="${escapeAttr(model.id)}"${model.id === provider.model ? ' selected' : ''}>${escapeHTML(model.label)}</option>`).join('');
-    const isActive = id === this.draftActive;
     const keyPlaceholder = provider.hasKey ? `已配置（${provider.keyHint}），留空则不修改` : '请输入 API Key';
     return `<div class="prov-panel${id === this.selectedProvider ? ' active' : ''}" data-panel="${id}">
       <div class="field"><label>模型</label><select data-f="model">${options}</select></div>
       <div class="field"><label>API Key</label><input type="password" data-f="apiKey" class="mono" autocomplete="off" placeholder="${escapeAttr(keyPlaceholder)}"><div class="hint">密钥保存在本地 config.json；接口返回时会自动脱敏。</div></div>
       <div class="field"><label>接口地址（Base URL）</label><input type="text" data-f="baseURL" class="mono" value="${escapeAttr(provider.baseURL)}" placeholder="${escapeAttr(catalog.baseURL)}"><div class="hint">使用 OpenAI 兼容的 chat/completions 地址。</div></div>
       <div class="prov-actions">
-        <button class="set-active-btn${isActive ? ' is-active' : ''}" data-setactive="${id}">${isActive ? '✓ 当前生效服务' : '设为当前服务'}</button>
         <button class="test-btn" data-test="${id}">测试服务</button>
         <span class="test-result" data-testresult="${id}"></span>
       </div>
@@ -163,7 +163,10 @@ export const Settings = {
     const provider = this.cfg.providers[this.selectedProvider];
     provider.model = panel.querySelector('[data-f="model"]').value;
     provider.baseURL = panel.querySelector('[data-f="baseURL"]').value;
-    provider._pendingKey = panel.querySelector('[data-f="apiKey"]').value;
+    // 仅在输入框有内容时才记录待保存的密钥；留空表示"不修改"，避免重新渲染后
+    // （密码框被清空）把之前输入但尚未保存的 Key 覆盖丢失。
+    const keyValue = panel.querySelector('[data-f="apiKey"]').value;
+    if (keyValue) provider._pendingKey = keyValue;
   },
 
   async test(id, button) {
@@ -200,7 +203,7 @@ export const Settings = {
     this.captureCurrent();
     const status = $('settings-status');
     const saveButton = $('settings-save');
-    const payload = { activeProvider: this.draftActive, providers: {}, agent: this.cfg.agent || {} };
+    const payload = { activeProvider: this.selectedProvider, providers: {}, agent: this.cfg.agent || {} };
     for (const id of Object.keys(this.cfg.providers)) {
       const provider = this.cfg.providers[id];
       payload.providers[id] = { model: provider.model, baseURL: provider.baseURL };

@@ -18,4 +18,5 @@ export const ChatState = {
   analysisElement: null,
   buffer: '',
   displayed: '',
+  reasoning: '',
 };

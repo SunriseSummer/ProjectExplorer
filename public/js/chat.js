@@ -66,6 +66,7 @@ export function resetChatState(path, type) {
     analysisElement: null,
     buffer: '',
     displayed: '',
+    reasoning: '',
   });
 }
 
@@ -257,7 +258,7 @@ function closePresetPop() {
 
 async function startChatStream(firstMessage) {
   if (ChatState.abortController) ChatState.abortController.abort();
-  Object.assign(ChatState, { streaming: true, buffer: '', displayed: '', abortController: new AbortController() });
+  Object.assign(ChatState, { streaming: true, buffer: '', displayed: '', reasoning: '', abortController: new AbortController() });
   setStreamingUI(true);
   ChatState.lastUserText = firstMessage;
   ChatState.lastUserElement = addUserMessage(firstMessage, ChatState.messages.length);
@@ -292,6 +293,12 @@ async function startChatStream(firstMessage) {
         if (payload.type === 'tool_result') {
           updateLastToolBar(payload.summary, payload.ok !== false);
           ensureAnalysisBar();
+        }
+        if (payload.type === 'progress') {
+          showProgress(payload.elapsedMs);
+        }
+        if (payload.type === 'reasoning') {
+          showReasoning(payload.content);
         }
         if (payload.type === 'discard') {
           discardStreamElement();
@@ -500,6 +507,35 @@ function discardStreamElement() {
   ChatState.streamElement = null;
   ChatState.buffer = '';
   ChatState.displayed = '';
+  ChatState.reasoning = '';
+}
+
+// 心跳进度：某些推理模型（如 KIMI 直接作答时）会静默思考很久且不吐 reasoning_content，
+// 此时仅靠服务端心跳展示已用时，证明模型在工作而非卡死。有真实思考文本时不覆盖。
+function showProgress(elapsedMs) {
+  const bar = ChatState.thinkingElement || ChatState.analysisElement;
+  if (!bar) return;
+  const sec = Math.max(0, Math.round((elapsedMs || 0) / 1000));
+  const title = bar.querySelector('.tool-title');
+  const detail = bar.querySelector('.tool-detail');
+  if (title) title.textContent = 'AI 正在深度思考';
+  if (detail && !ChatState.reasoning) detail.textContent = `模型正在推理，请稍候…（已用时 ${sec}s）`;
+}
+
+// 把推理模型的"思考"实时显示在当前状态条上，让用户看到模型确实在工作，
+// 而不是面对长时间静止的"思考中"以为卡死。
+function showReasoning(delta) {
+  ChatState.reasoning = (ChatState.reasoning || '') + delta;
+  const bar = ChatState.thinkingElement || ChatState.analysisElement;
+  if (!bar) return;
+  const title = bar.querySelector('.tool-title');
+  const detail = bar.querySelector('.tool-detail');
+  if (title) title.textContent = 'AI 正在思考';
+  if (detail) {
+    // tool-detail 单行省略号会从右侧裁剪，这里只取末尾片段，让可见文字随思考持续滚动更新。
+    const tail = ChatState.reasoning.replace(/\s+/g, ' ').trim().slice(-72);
+    detail.textContent = tail || '正在组织思路…';
+  }
 }
 
 function ensureThinkingBar() {
@@ -530,6 +566,7 @@ function ensureAnalysisBar() {
   ChatState.thinkingElement?.remove();
   ChatState.thinkingElement = null;
   if (ChatState.analysisElement?.isConnected) return;
+  ChatState.reasoning = ''; // 进入新一轮"整合证据"阶段，重置思考缓冲，状态条只显示当前阶段的思考
   const item = document.createElement('div');
   item.className = 'chat-msg tool analyzing';
   item.innerHTML = toolBarHTML({
