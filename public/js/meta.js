@@ -1,0 +1,134 @@
+import { State } from './state.js';
+
+export const KIND = {
+  module: ['模块', 'var(--teal)', '◉'],
+  dir: ['目录', 'var(--blue)', '▦'],
+  source: ['源码', 'var(--blue)', '⌗'],
+  config: ['配置', 'var(--orange)', '⚙'],
+  docs: ['文档', 'var(--muted)', '✎'],
+  asset: ['资源', 'var(--gray)', '▤'],
+  agent: ['代理', 'var(--purple)', '◆'],
+  skill: ['技能', 'var(--teal)', '✦'],
+  mcp: ['MCP', 'var(--teal)', '⇆'],
+  file: ['文件', 'var(--faint)', '□'],
+};
+
+export const EXT_KIND = {
+  '.ts': 'source',
+  '.tsx': 'source',
+  '.js': 'source',
+  '.mjs': 'source',
+  '.cjs': 'source',
+  '.py': 'source',
+  '.ets': 'source',
+  '.c': 'source',
+  '.cpp': 'source',
+  '.h': 'source',
+  '.hpp': 'source',
+  '.sh': 'source',
+  '.bat': 'source',
+  '.java': 'source',
+  '.kt': 'source',
+  '.rs': 'source',
+  '.go': 'source',
+  '.vue': 'source',
+  '.jsx': 'source',
+  '.json': 'config',
+  '.json5': 'config',
+  '.toml': 'config',
+  '.yml': 'config',
+  '.yaml': 'config',
+  '.xml': 'config',
+  '.gradle': 'config',
+  '.lock': 'config',
+  '.ini': 'config',
+  '.cfg': 'config',
+  '.prettierrc': 'config',
+  '.gitignore': 'config',
+  '.md': 'docs',
+  '.txt': 'docs',
+  '.png': 'asset',
+  '.jpg': 'asset',
+  '.jpeg': 'asset',
+  '.gif': 'asset',
+  '.svg': 'asset',
+  '.webp': 'asset',
+  '.bmp': 'asset',
+  '.ico': 'asset',
+  '.whl': 'asset',
+  '.jar': 'asset',
+  '.zip': 'asset',
+};
+
+export const HLJS_LANG = {
+  '.ts': 'typescript',
+  '.tsx': 'typescript',
+  '.ets': 'typescript',
+  '.js': 'javascript',
+  '.mjs': 'javascript',
+  '.cjs': 'javascript',
+  '.py': 'python',
+  '.json': 'json',
+  '.json5': 'json',
+  '.md': 'markdown',
+  '.xml': 'xml',
+  '.html': 'xml',
+  '.svg': 'xml',
+  '.css': 'css',
+  '.toml': 'ini',
+  '.yml': 'yaml',
+  '.yaml': 'yaml',
+  '.sh': 'bash',
+  '.bat': 'dos',
+  '.c': 'c',
+  '.cpp': 'cpp',
+  '.h': 'cpp',
+  '.hpp': 'cpp',
+  '.gradle': 'groovy',
+  '.java': 'java',
+  '.kt': 'kotlin',
+  '.rs': 'rust',
+  '.go': 'go',
+  '.sql': 'sql',
+};
+
+export const EXT_LABEL = {
+  '.ts': 'TypeScript',
+  '.js': 'JavaScript',
+  '.mjs': 'JavaScript (ESM)',
+  '.py': 'Python',
+  '.ets': 'ArkTS',
+  '.md': 'Markdown',
+  '.json': 'JSON',
+  '.json5': 'JSON5',
+  '.toml': 'TOML',
+  '.yml': 'YAML',
+  '.yaml': 'YAML',
+  '.xml': 'XML',
+  '.svg': 'SVG',
+  '.txt': 'Text',
+  '.css': 'CSS',
+  '.html': 'HTML',
+  '.sh': 'Shell',
+  '.bat': 'Batch',
+  '.java': 'Java',
+  '.kt': 'Kotlin',
+  '.rs': 'Rust',
+  '.go': 'Go',
+};
+
+export function kindMeta(kind) {
+  return KIND[kind] || KIND.file;
+}
+
+export function kindOf(node) {
+  const annotation = State.annotations[node.path];
+  if (annotation?.kind) return annotation.kind;
+  if (node.type === 'dir') return node.path === '' ? 'module' : 'dir';
+  return EXT_KIND[node.ext] || EXT_KIND[node.name] || 'file';
+}
+
+export function getAnnotation(node) {
+  if (State.project.toLowerCase() !== 'hometrans') return null;
+  return State.annotations[node.path] || null;
+}

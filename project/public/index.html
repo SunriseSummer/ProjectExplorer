@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectExplorer · 项目解析</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" id="hljs-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">PE</div>
+      <div>
+        <div class="t1">ProjectExplorer</div>
+        <div class="t2" id="brand-sub">项目解析器</div>
+      </div>
+    </div>
+    <div class="tree-head">目录树<span class="right" id="tree-count"></span></div>
+    <div class="tree" id="tree"><div class="loading">正在加载项目结构...</div></div>
+    <div class="side-foot">
+      <span class="pill"><span class="d"></span>AI 驱动 · 流式对话</span><br>
+      模型：<b id="foot-model">未加载</b>
+    </div>
+  </aside>
+
+  <div class="modal-overlay" id="settings-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head">
+        <span class="modal-title" id="settings-title">⚙ 模型与 Agent 配置</span>
+        <button class="icon-btn" id="settings-close" title="关闭">×</button>
+      </div>
+      <div class="modal-body" id="settings-body">
+        <div class="loading">正在加载配置...</div>
+      </div>
+      <div class="modal-foot">
+        <span class="modal-status" id="settings-status"></span>
+        <div class="modal-foot-spacer"></div>
+        <button class="btn-ghost" id="settings-cancel">取消</button>
+        <button class="btn-primary" id="settings-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="main">
+    <div class="topbar">
+      <nav class="crumbs" id="crumbs"></nav>
+      <div class="spacer"></div>
+      <div class="proj"><span class="dot"></span><span id="proj-desc">选择目录或文件查看 AI 解析</span></div>
+      <button class="icon-btn" id="btn-settings" title="模型配置">&#x2699;</button>
+      <button class="icon-btn" id="btn-theme" title="切换深浅主题">&#x263e;</button>
+    </div>
+    <div class="content" id="content">
+      <div class="empty">从左侧目录树选择目录或文件以查看解析说明</div>
+    </div>
+  </main>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

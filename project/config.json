@@ -1,0 +1,40 @@
+{
+  "activeProvider": "deepseek",
+  "providers": {
+    "deepseek": {
+      "apiKey": "",
+      "model": "deepseek-v4-pro",
+      "baseURL": "https://api.deepseek.com/chat/completions"
+    },
+    "glm": {
+      "apiKey": "",
+      "model": "glm-5.2",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    },
+    "kimi": {
+      "apiKey": "",
+      "model": "kimi-k2.6",
+      "baseURL": "https://api.moonshot.cn/v1/chat/completions"
+    },
+    "qwen": {
+      "apiKey": "",
+      "model": "qwen3.7-max",
+      "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+    }
+  },
+  "agent": {
+    "fileContextMaxChars": 204800,
+    "treeSnapshotMaxChars": 24000,
+    "toolFileMaxChars": 204800,
+    "fileSliceMaxLines": 1200,
+    "searchMaxMatches": 60,
+    "searchMaxFiles": 600,
+    "maxAgentTurns": 16,
+    "maxToolCallsPerTurn": 8,
+    "maxTotalToolCalls": 35,
+    "toolResultMaxChars": 32000,
+    "maxTotalToolResultChars": 420000,
+    "maxTokens": 4096,
+    "streamForwardMinChars": 48
+  }
+}
