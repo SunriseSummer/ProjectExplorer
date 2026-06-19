@@ -1,6 +1,6 @@
 # ProjectExplorer
 
-ProjectExplorer 是一个本地 Web 应用，用来浏览并分析任意项目源码。它默认读取 `project/` 中的真实目录结构，提供目录导航、文件预览、AI 对话、预置问题和模型服务配置能力。
+ProjectExplorer 是一个本地 Web 应用，用来浏览并分析任意项目源码。请将待分析项目放到 `project/` 目录下，本应用会加载呈现，提供目录导航、文件预览、AI 分析等能力。
 
 <img width="2769" height="1743" alt="image" src="https://github.com/user-attachments/assets/23fc96ef-e78b-4162-a7e2-26c4698ccba7" />
 
