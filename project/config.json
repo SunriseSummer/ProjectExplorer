@@ -23,18 +23,18 @@
     }
   },
   "agent": {
-    "fileContextMaxChars": 204800,
-    "treeSnapshotMaxChars": 24000,
-    "toolFileMaxChars": 204800,
-    "fileSliceMaxLines": 1200,
+    "fileContextMaxChars": 100000,
+    "treeSnapshotMaxChars": 30000,
+    "toolFileMaxChars": 100000,
+    "fileSliceMaxLines": 2000,
     "searchMaxMatches": 60,
-    "searchMaxFiles": 600,
-    "maxAgentTurns": 16,
+    "searchMaxFiles": 1000,
+    "maxAgentTurns": 20,
     "maxToolCallsPerTurn": 8,
-    "maxTotalToolCalls": 35,
-    "toolResultMaxChars": 32000,
-    "maxTotalToolResultChars": 420000,
-    "maxTokens": 4096,
+    "maxTotalToolCalls": 100,
+    "toolResultMaxChars": 50000,
+    "maxTotalToolResultChars": 600000,
+    "maxTokens": 10000,
     "streamForwardMinChars": 48
   }
 }

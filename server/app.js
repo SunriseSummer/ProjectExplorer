@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import { createAnalysisStore } from './analysis-store.js';
-import { loadAnnotations } from './annotations.js';
 import { createApiRouter } from './api-router.js';
 import { createAgentService } from './agent-service.js';
 import { createConfigStore } from './config-store.js';
@@ -14,9 +13,8 @@ export async function startServer() {
   const configStore = createConfigStore(CONFIG_FILE);
   const analysisStore = createAnalysisStore(ANALYSES_DIR);
   const projectService = createProjectService(PROJECT_DIR, PROJECT_NAME, configStore);
-  const annotations = await loadAnnotations(PROJECT_NAME);
   const agentService = createAgentService({ projectService, configStore });
-  const handleApi = createApiRouter({ annotations, analysisStore, agentService, configStore, projectService });
+  const handleApi = createApiRouter({ analysisStore, agentService, configStore, projectService });
 
   if (!fs.existsSync(PROJECT_DIR)) {
     console.warn(`未找到被分析项目目录: ${PROJECT_DIR}`);

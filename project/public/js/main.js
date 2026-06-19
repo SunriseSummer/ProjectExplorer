@@ -13,10 +13,9 @@ async function boot() {
   initTheme();
 
   try {
-    const [treeRes, annotations] = await Promise.all([Api.tree(), Api.annotations()]);
+    const treeRes = await Api.tree();
     State.tree = treeRes.tree;
     State.project = treeRes.project;
-    State.annotations = annotations || {};
     $('brand-sub').textContent = `${treeRes.project} · 项目解析`;
     $('tree-count').textContent = `${countFiles(State.tree)} files`;
     $('proj-desc').textContent = `${treeRes.project} · 选择目录或文件开始`;

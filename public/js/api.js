@@ -7,7 +7,6 @@ export async function fetchJSON(url, options) {
 
 export const Api = {
   tree: () => fetchJSON('/api/tree'),
-  annotations: () => fetchJSON('/api/annotations').catch(() => ({})),
   config: () => fetchJSON('/api/config'),
   saveConfig: (payload) => fetchJSON('/api/config', jsonOptions(payload)),
   testConfig: (payload) => fetchJSON('/api/config/test', jsonOptions(payload)),

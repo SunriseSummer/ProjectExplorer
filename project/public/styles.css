@@ -260,11 +260,13 @@ button{font-family:inherit}
 .chat-input:disabled{opacity:.5;cursor:not-allowed}
 .chat-input-actions{position:absolute;right:9px;bottom:9px;display:flex;align-items:center;gap:8px}
 .chat-tool-btn{width:32px;height:32px;border-radius:9px;border:1px solid var(--line2);
-  background:var(--panel);color:var(--ink2);cursor:pointer;display:grid;place-items:center;transition:all .15s ease}
-.chat-tool-btn:hover{border-color:var(--teal-dim);color:var(--teal);background:var(--teal-bg)}
+  background:linear-gradient(180deg,var(--panel),var(--panel2));color:var(--ink2);cursor:pointer;
+  display:grid;place-items:center;transition:all .15s ease;box-shadow:0 1px 3px rgba(2,10,18,.08)}
+.chat-tool-btn:hover{border-color:var(--teal-dim);color:var(--teal);background:var(--teal-bg);
+  box-shadow:0 2px 8px rgba(13,143,127,.14)}
 .chat-tool-btn:active{transform:scale(.94)}
 .chat-tool-btn:disabled{opacity:.4;cursor:not-allowed}
-.matrix-icon{width:16px;height:16px}
+.matrix-icon{width:20px;height:20px}
 .matrix-icon rect{fill:currentColor}
 .chat-send{width:34px;height:34px;border-radius:50%;border:none;
   background:var(--teal);color:var(--btn-primary-tx);cursor:pointer;
@@ -283,7 +285,7 @@ button{font-family:inherit}
 
 /* Preset popover (in-place expand) */
 .preset-pop{position:absolute;right:9px;bottom:50px;width:min(360px,calc(100% - 18px));
-  max-height:min(300px,44vh);overflow-y:auto;z-index:30;padding:8px;
+  max-height:min(300px,44vh);overflow-y:auto;overscroll-behavior:contain;z-index:30;padding:8px;
   background:var(--panel);border:1px solid var(--line2);border-radius:12px;
   box-shadow:var(--shadow);animation:fadein .14s ease}
 .preset-pop[hidden]{display:none}

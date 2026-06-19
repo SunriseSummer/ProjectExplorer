@@ -4,7 +4,7 @@ import { MIME_TYPES } from './constants.js';
 import { openSSE, readJSONBody, sendJSON } from './http-utils.js';
 import { testProviderConnection } from './llm.js';
 
-export function createApiRouter({ annotations, analysisStore, agentService, configStore, projectService }) {
+export function createApiRouter({ analysisStore, agentService, configStore, projectService }) {
   return async function handleApi(url, req, res) {
     if (url.pathname === '/api/chat' && req.method === 'POST') {
       let body;
@@ -32,8 +32,6 @@ export function createApiRouter({ annotations, analysisStore, agentService, conf
         return sendJSON(res, 500, { error: `无法读取项目目录: ${projectService.projectDir}; ${error.message}` });
       }
     }
-
-    if (url.pathname === '/api/annotations') return sendJSON(res, 200, annotations);
 
     if (url.pathname === '/api/config/test' && req.method === 'POST') {
       let body;

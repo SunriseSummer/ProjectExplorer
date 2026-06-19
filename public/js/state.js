@@ -1,5 +1,4 @@
 export const State = {
-  annotations: {},
   tree: null,
   project: '',
   rowByPath: new Map(),

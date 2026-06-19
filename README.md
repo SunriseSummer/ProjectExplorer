@@ -1,12 +1,14 @@
 # ProjectExplorer
 
-ProjectExplorer 是一个本地 Web 应用，用来浏览并分析任意项目源码。它会读取 `project/` 中的真实目录结构，提供文件预览、目录导航、AI 对话和模型服务配置能力。
+ProjectExplorer 是一个本地 Web 应用，用来浏览并分析任意项目源码。它默认读取 `project/` 中的真实目录结构，提供目录导航、文件预览、AI 对话、预置问题和模型服务配置能力。
 
 ## 功能
 
 - 左侧目录树展示被分析项目的真实文件结构，并自动忽略 `node_modules`、`.git`、`dist` 等目录。
 - 右侧支持目录概览、文件预览、图片预览和二进制文件提示。
+- 目录内容卡片会展示子目录的直接子项数量，便于快速判断目录规模。
 - 内置 Agent 对话接口，模型可通过工具读取目录、读取文件、批量读取相关文件和搜索代码。
+- 输入框内置预置问题面板，可按项目、目录、文件上下文快速生成可编辑问题。
 - 面向大型项目优化了上下文策略：先绘制项目地图、发现关键文件，再用文件大纲和行段读取进行局部精读。
 - 支持 DeepSeek、GLM、KIMI、Qwen 等 OpenAI 兼容 `chat/completions` 服务。
 - 对话分析记录保存到 `analyses/<项目名>/`，目录结构与被分析项目保持一致。
@@ -16,13 +18,17 @@ ProjectExplorer 是一个本地 Web 应用，用来浏览并分析任意项目�
 ```text
 .
 ├─ server.js                 # 启动入口
-├─ src/server/               # 后端模块
+├─ server/                   # 后端模块
 │  ├─ app.js                 # 组装 HTTP 服务
 │  ├─ api-router.js          # API 路由
 │  ├─ agent-service.js       # LLM/Agent 调用与工具编排
 │  ├─ project-service.js     # 项目目录、文件读取、搜索
 │  ├─ config-store.js        # 模型配置读写与脱敏
-│  └─ analysis-store.js      # 分析归档读写
+│  ├─ analysis-store.js      # 分析归档读写
+│  ├─ provider-catalog.js    # 模型服务商默认配置
+│  ├─ constants.js           # 文件类型、忽略规则和默认策略
+│  ├─ paths.js               # 应用路径与环境变量解析
+│  └─ static-service.js      # 静态资源服务
 ├─ public/
 │  ├─ index.html
 │  ├─ styles.css
@@ -51,6 +57,13 @@ http://localhost:5173
 PORT=5183 PROJECT_DIR=C:\path\to\project npm start
 ```
 
+开发时也可以使用：
+
+```bash
+npm run dev
+npm run check
+```
+
 ## 模型配置
 
 点击右上角设置按钮可以配置各服务的 API Key、模型名和接口地址。配置保存在本地 `config.json`，接口返回时只暴露是否已配置和密钥尾号。
@@ -68,7 +81,6 @@ PORT=5183 PROJECT_DIR=C:\path\to\project npm start
 ## API
 
 - `GET /api/tree`：读取项目目录树。
-- `GET /api/annotations`：读取可选静态标注。
 - `GET /api/config` / `POST /api/config`：读取或保存模型配置。
 - `POST /api/config/test`：测试指定模型服务连通性。
 - `POST /api/chat`：Agent SSE 对话接口。
@@ -97,4 +109,4 @@ Agent 面对复杂项目时会优先使用低成本工具建立上下文：
 
 ## 开发说明
 
-本次应用源码重构只涉及根目录、`src/server/` 和 `public/`。`project/` 是被分析对象，`analyses/` 是运行数据，开发时不要把它们当作应用源码重构目标。
+应用源码主要位于根目录入口、`server/` 和 `public/`。`project/` 是默认被分析对象，`analyses/` 是运行时分析归档，开发或重构应用本身时通常不要把它们当作应用源码目标。

@@ -1,9 +1,9 @@
 import { Api } from './api.js';
 import { bindChatEvents, renderChatSection, resetChatState, restoreOrRenderAskPanel } from './chat.js';
-import { EXT_LABEL, getAnnotation, HLJS_LANG, kindMeta, kindOf } from './meta.js';
+import { EXT_LABEL, HLJS_LANG, kindMeta, kindOf } from './meta.js';
 import { State } from './state.js';
 import { expandTo, renderCrumbs, setActiveRow } from './tree-view.js';
-import { $, escapeAttr, escapeHTML, formatSize, stripTags, truncate } from './utils.js';
+import { $, escapeAttr, escapeHTML, formatSize, truncate } from './utils.js';
 
 let selectPathRef = () => {};
 
@@ -25,9 +25,7 @@ export async function selectPath(path) {
 }
 
 async function renderDir(node) {
-  const annotation = getAnnotation(node);
   let html = '<div class="view">';
-  if (annotation) html += annotationCard(node, annotation);
   if (node.children?.length) html += renderChildrenList(node);
   html += `${renderChatSection(node)}</div>`;
   $('content').innerHTML = html;
@@ -46,27 +44,12 @@ async function renderFile(node) {
   highlightCode();
 }
 
-function annotationCard(node, annotation) {
-  const [, color] = kindMeta(kindOf(node));
-  const shownPath = node.path === '' ? '/' : `/${node.path}`;
-  return `<div class="card accent" style="--kc:${color}">
-    <div class="hd">
-      <span class="t">${escapeHTML(annotation.title || node.name)}</span>
-      <span class="kind-chip" style="color:${color};background:color-mix(in srgb,${color} 14%,transparent);border-color:${color}">${kindMeta(kindOf(node))[0]}</span>
-      <span class="path">${escapeHTML(shownPath)}</span>
-    </div>
-    <div class="summary">${escapeHTML(annotation.summary || '')}</div>
-    ${annotation.detail ? `<div class="prose-detail">${annotation.detail.map((item) => `<p>${escapeHTML(item)}</p>`).join('')}</div>` : ''}
-  </div>`;
-}
-
 function renderChildrenList(node) {
   const children = node.children || [];
   const items = children.map((child) => {
     const [label, color, icon] = kindMeta(kindOf(child));
-    const annotation = getAnnotation(child);
-    const description = annotation ? stripTags(annotation.summary || '') : child.type === 'dir' ? '目录' : EXT_LABEL[child.ext] || (child.ext ? `${child.ext.slice(1).toUpperCase()} 文件` : '文件');
-    const meta = child.type === 'file' ? `${formatSize(child.size || 0)} · ${label}` : label;
+    const description = child.type === 'dir' ? '目录' : EXT_LABEL[child.ext] || (child.ext ? `${child.ext.slice(1).toUpperCase()} 文件` : '文件');
+    const meta = child.type === 'file' ? `${formatSize(child.size || 0)} · ${label}` : `${child.children?.length || 0} 项`;
     return `<div class="cl-item" data-p="${escapeAttr(child.path)}">
       <span class="ci" style="color:${color}">${icon}</span>
       <div style="min-width:0">

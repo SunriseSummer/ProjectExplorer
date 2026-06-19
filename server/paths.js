@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 export const CONFIG_FILE = path.join(ROOT_DIR, 'config.json');
 export const PROJECT_DIR = path.resolve(

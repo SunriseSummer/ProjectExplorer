@@ -1,5 +1,3 @@
-import { State } from './state.js';
-
 export const KIND = {
   module: ['模块', 'var(--teal)', '◉'],
   dir: ['目录', 'var(--blue)', '▦'],
@@ -122,13 +120,6 @@ export function kindMeta(kind) {
 }
 
 export function kindOf(node) {
-  const annotation = State.annotations[node.path];
-  if (annotation?.kind) return annotation.kind;
   if (node.type === 'dir') return node.path === '' ? 'module' : 'dir';
   return EXT_KIND[node.ext] || EXT_KIND[node.name] || 'file';
-}
-
-export function getAnnotation(node) {
-  if (State.project.toLowerCase() !== 'hometrans') return null;
-  return State.annotations[node.path] || null;
 }
