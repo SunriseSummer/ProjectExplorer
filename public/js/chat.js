@@ -123,6 +123,7 @@ export function bindChatEvents(node) {
     }
   };
   input.oninput = () => autoGrowInput(input);
+  $('chat-msgs').onclick = onChatMessagesClick;
   if (presetBtn) {
     presetBtn.onclick = (event) => {
       event.stopPropagation();
@@ -259,7 +260,7 @@ async function startChatStream(firstMessage) {
   Object.assign(ChatState, { streaming: true, buffer: '', displayed: '', abortController: new AbortController() });
   setStreamingUI(true);
   ChatState.lastUserText = firstMessage;
-  ChatState.lastUserElement = addUserMessage(firstMessage);
+  ChatState.lastUserElement = addUserMessage(firstMessage, ChatState.messages.length);
   ChatState.messages.push({ role: 'user', content: firstMessage });
   ensureThinkingBar();
 
@@ -348,10 +349,11 @@ async function resetConversation(node) {
   renderEmptyState(node);
 }
 
-function addUserMessage(text) {
+function addUserMessage(text, messageIndex) {
   const item = document.createElement('div');
   item.className = 'chat-msg user';
-  item.innerHTML = `<div class="usr-banner"><span class="usr-label">Q</span><span class="usr-text">${escapeHTML(text)}</span></div>`;
+  item.dataset.messageIndex = String(messageIndex);
+  item.innerHTML = userMessageHTML(text);
   $('chat-msgs').appendChild(item);
   scrollChat();
   return item;
@@ -388,19 +390,57 @@ function abortChat() {
   if (!ChatState.messages.length) renderEmptyState(ChatState.node);
 }
 
+function onChatMessagesClick(event) {
+  const button = event.target.closest('.usr-delete');
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (ChatState.streaming) return;
+  deleteMessagePair(Number(button.closest('.chat-msg.user')?.dataset.messageIndex));
+}
+
+async function deleteMessagePair(index) {
+  if (!Number.isInteger(index) || ChatState.messages[index]?.role !== 'user') return;
+  const deleteCount = ChatState.messages[index + 1]?.role === 'assistant' ? 2 : 1;
+  ChatState.messages.splice(index, deleteCount);
+  if (ChatState.messages.length) {
+    await Api.saveAnalysis({ path: ChatState.currentPath, messages: ChatState.messages }).catch(() => null);
+    renderSavedMessages(ChatState.messages);
+  } else {
+    await Api.deleteAnalysis(ChatState.currentPath);
+    $('chat-msgs').innerHTML = '';
+    renderEmptyState(ChatState.node);
+  }
+}
+
 function renderSavedMessages(messages) {
   ChatState.messages = messages;
   const host = $('chat-msgs');
   host.innerHTML = '';
-  for (const message of messages) {
+  messages.forEach((message, index) => {
     const item = document.createElement('div');
     item.className = `chat-msg ${message.role === 'user' ? 'user' : 'assistant'}`;
-    item.innerHTML = message.role === 'user'
-      ? `<div class="usr-banner"><span class="usr-label">Q</span><span class="usr-text">${escapeHTML(message.content)}</span></div>`
-      : `<div class="doc-body">${renderMarkdown(message.content)}</div>`;
+    if (message.role === 'user') item.dataset.messageIndex = String(index);
+    item.innerHTML = message.role === 'user' ? userMessageHTML(message.content) : `<div class="doc-body">${renderMarkdown(message.content)}</div>`;
     host.appendChild(item);
-  }
+  });
   scrollChat();
+}
+
+function userMessageHTML(text) {
+  return `<div class="usr-banner">
+    <span class="usr-label">Q</span>
+    <span class="usr-text">${escapeHTML(text)}</span>
+    <button class="usr-delete" type="button" title="删除此轮对话" aria-label="删除此轮对话">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 6h18"></path>
+        <path d="M8 6V4h8v2"></path>
+        <path d="M19 6l-1 14H6L5 6"></path>
+        <path d="M10 11v5"></path>
+        <path d="M14 11v5"></path>
+      </svg>
+    </button>
+  </div>`;
 }
 
 function newAssistantMessage() {
@@ -556,6 +596,9 @@ function setStreamingUI(streaming) {
   const presets = $('chat-presets');
   if (input) input.disabled = streaming;
   if (presets) presets.disabled = streaming;
+  $('chat-msgs')?.querySelectorAll('.usr-delete').forEach((button) => {
+    button.disabled = streaming;
+  });
   if (streaming) closePresetPop();
   if (send) {
     // 生成中：纸飞机变为终止按钮（仍可点击）；否则恢复发送
