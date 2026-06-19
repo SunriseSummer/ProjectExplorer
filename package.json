@@ -1,6 +1,6 @@
 {
   "name": "project-explorer",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "通用项目源码解析 Web 应用，内置 OpenAI 兼容 LLM / Agent 对话能力。",
   "type": "module",
