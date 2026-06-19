@@ -283,7 +283,7 @@ button{font-family:inherit}
 
 /* Preset popover (in-place expand) */
 .preset-pop{position:absolute;right:9px;bottom:50px;width:min(360px,calc(100% - 18px));
-  max-height:min(300px,44vh);overflow-y:auto;z-index:30;padding:8px;
+  max-height:min(300px,44vh);overflow-y:auto;overscroll-behavior:contain;z-index:30;padding:8px;
   background:var(--panel);border:1px solid var(--line2);border-radius:12px;
   box-shadow:var(--shadow);animation:fadein .14s ease}
 .preset-pop[hidden]{display:none}

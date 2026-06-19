@@ -195,7 +195,7 @@ function togglePresetPop(node) {
   setTimeout(() => {
     document.addEventListener('click', onPresetOutsideClick);
     window.addEventListener('resize', closePresetPop);
-    window.addEventListener('scroll', closePresetPop, true);
+    window.addEventListener('scroll', onPresetWindowScroll, true);
   }, 0);
 }
 
@@ -234,6 +234,13 @@ function onPresetOutsideClick(event) {
   closePresetPop();
 }
 
+function onPresetWindowScroll(event) {
+  const pop = $('preset-pop');
+  if (!pop || pop.hidden) return;
+  if (event.target === pop || event.target.closest?.('#preset-pop')) return;
+  closePresetPop();
+}
+
 function closePresetPop() {
   const pop = $('preset-pop');
   if (pop) {
@@ -244,7 +251,7 @@ function closePresetPop() {
   }
   document.removeEventListener('click', onPresetOutsideClick);
   window.removeEventListener('resize', closePresetPop);
-  window.removeEventListener('scroll', closePresetPop, true);
+  window.removeEventListener('scroll', onPresetWindowScroll, true);
 }
 
 async function startChatStream(firstMessage) {
