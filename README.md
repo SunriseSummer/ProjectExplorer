@@ -1,6 +1,6 @@
 # ProjectExplorer
 
-ProjectExplorer 是一个本地 Web 应用，用来浏览并分析任意项目源码。请将待分析项目放到 `project/` 目录下，本应用会加载呈现，提供目录导航、文件预览、AI 分析等能力。
+ProjectExplorer 是一个本地 Web 应用，用来浏览并智能分析任意项目。请将待分析项目放到 `project/` 目录下，应用会加载呈现，提供目录导航、文件预览、AI 分析等能力。
 
 <img width="2769" height="1743" alt="image" src="https://github.com/user-attachments/assets/23fc96ef-e78b-4162-a7e2-26c4698ccba7" />
 
@@ -10,7 +10,7 @@ ProjectExplorer 是一个本地 Web 应用，用来浏览并分析任意项目�
 - 左侧目录树展示被分析项目的真实文件结构，并自动忽略 `node_modules`、`.git`、`dist` 等目录。
 - 右侧支持目录概览、文件预览、图片预览和二进制文件提示。
 - 目录内容卡片会展示子目录的直接子项数量，便于快速判断目录规模。
-- 内置 Agent 对话接口，模型可通过工具读取目录、读取文件、批量读取相关文件和搜索代码。
+- 提供了项目智能分析 Agent，可通过工具获取项目结构、读取目录、读取文件和搜索代码等。
 - 输入框内置预置问题面板，可按项目、目录、文件上下文快速生成可编辑问题。
 - 面向大型项目优化了上下文策略：先绘制项目地图、发现关键文件，再用文件大纲和行段读取进行局部精读。
 - 支持 DeepSeek、GLM、KIMI、Qwen 等 OpenAI 兼容 `chat/completions` 服务。
