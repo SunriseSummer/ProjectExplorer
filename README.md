@@ -76,9 +76,6 @@ npm run check
 | --- | --- | --- |
 | `PORT` | `5173` | Web 服务端口 |
 | `PROJECT_DIR` | `./project` | 被分析项目目录 |
-| `HOMETRANS_DIR` | 无 | 兼容旧名称，优先级低于 `PROJECT_DIR` |
-| `DEEPSEEK_API_KEY` | 空 | DeepSeek 初始密钥 |
-| `DEEPSEEK_MODEL` | `deepseek-v4-pro` | DeepSeek 初始模型 |
 
 ## API
 
